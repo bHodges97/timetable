@@ -16,18 +16,19 @@ def load_buildings(path):
     buildings = dict()
     with open(path,'r') as f:
         reader = csv.reader(f)
+        next(reader,None)#skip header
         for name,lattitude,longitude in reader:
             building = Building(name,lattitude,longitude)
             buildings[name] = building
     return buildings
 
-def load_rooms(path, buildings):
+def load_rooms(rooms_path, equip_path buildings):
     rooms = Rooms()
     worksheet = pyxl.load_workbook(path,read_only = True, data_only = True).active
     for room_name,building_name,capacity in worksheet.iter_rows(min_row=2,values_only=True):
         building = buildings[building_name]
-        room = Room(room_name,building,capacity)
-        rooms[room_name] = room
+        rooms[room_name] = Room(room_name,building,capacity)
+    load_equipment(equip_list, rooms)
     return rooms
 
 def load_equipment(path, rooms):
@@ -36,7 +37,7 @@ def load_equipment(path, rooms):
         try:
             rooms[room_name].load_equipment(equipment_list)
         except KeyError:
-            print(room_name, "not found")
+            print("No capacity listed for:",room_name)
 
 
 
@@ -45,11 +46,8 @@ if __name__ == "__main__":
     paths = [os.path.join("Data",x) for x in files]
 
     buildings = load_buildings(paths[3])
-    rooms = load_rooms(paths[0],buildings)
-    load_equipment(paths[1],rooms)
+    rooms = load_rooms(paths[0], paths[1], buildings)
 
-    distance_matrix(buildings)
-    equipment_list = pyxl.load_workbook(paths[1]).active
     timetable = pyxl.load_workbook(paths[2]).active
 
 
