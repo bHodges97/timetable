@@ -1,43 +1,42 @@
 import os
-import csv
-import openpyxl as pyxl
 import numpy as np
 from building import *
+from timeutils import *
+from yattag import Doc
 
-def distance_matrix(buildings):
-    distances = []
-    for x in buildings.values():
-        distances.append([x.distance_to(y) for y in buildings.values()])
-    distances = np.array(distances)
-    #print(distances)
-    return distances
+def matches(string, patterns):
+    return any(string.startswith(pattern) for pattern in patterns)
 
-def load_buildings(path):
-    buildings = dict()
-    with open(path,'r') as f:
-        reader = csv.reader(f)
-        next(reader,None)#skip header
-        for name,lattitude,longitude in reader:
-            building = Building(name,lattitude,longitude)
-            buildings[name] = building
-    return buildings
+def make_timetable(path,codes):
+    days = set()
+    start_times = set()
+    end_times = set()
+    column_headers = set()
 
-def load_rooms(rooms_path, equip_path buildings):
-    rooms = Rooms()
-    worksheet = pyxl.load_workbook(path,read_only = True, data_only = True).active
-    for room_name,building_name,capacity in worksheet.iter_rows(min_row=2,values_only=True):
-        building = buildings[building_name]
-        rooms[room_name] = Room(room_name,building,capacity)
-    load_equipment(equip_list, rooms)
-    return rooms
 
-def load_equipment(path, rooms):
-    worksheet = pyxl.load_workbook(path,read_only = True, data_only = True).active
-    for room_name,equipment_list in worksheet.iter_rows(min_row=2,max_col=2,values_only=True):
-        try:
-            rooms[room_name].load_equipment(equipment_list)
-        except KeyError:
-            print("No capacity listed for:",room_name)
+    timetable = pyxl.load_workbook(paths[2], read_only = True, data_only = True).active
+    for row in timetable.iter_rows(min_row=2,values_only=True):
+        module = str(row[1])
+        day,time,length,weeks = row[4:8]
+        if module and row[0] and row[4]:
+            if any(matches(x,codes) for x in module.split(',')):
+                end_time = minute_to_time(time_to_minute(time) + str_to_minute(length))
+                print(day,time,length,end_time)
+                days.add(day)
+                times.add(time)
+    print(days)
+    print(sorted(list(filter(None,times))))
+
+
+def load_timetable(path):
+    timetable = pyxl.load_workbook(paths[2], read_only = True, data_only = True).active
+    modules = set()
+    for row in timetable.iter_rows(min_row=2,values_only=True):
+        module = row[1]
+        day,time,length,weeks = row[4:8]
+        if module:
+            print(module)
+            modules.update(module.split(","))
 
 
 
@@ -45,11 +44,9 @@ if __name__ == "__main__":
     files = ["Room List.xlsx", "Roomequip.xlsx", "Timetable2018-19.xlsx","buildings.csv"]
     paths = [os.path.join("Data",x) for x in files]
 
-    buildings = load_buildings(paths[3])
-    rooms = load_rooms(paths[0], paths[1], buildings)
+    #buildings = load_buildings(paths[3])
+    #rooms = load_rooms(paths[0], paths[1], buildings)
 
-    timetable = pyxl.load_workbook(paths[2]).active
-
-
-
-
+    #timetable = pyxl.load_workbook(paths[2]).active
+    make_timetable(paths[2],"CS1")
+    #get_info(paths[2])
