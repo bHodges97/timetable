@@ -1,5 +1,5 @@
 # timetable maker
-Creates a HTML timetable.
+Creates HTML timetable.
 
 ## Installation
 ```
@@ -7,12 +7,13 @@ pip install -r requirements.txt
 ```
 
 ## Usage
-Generate list event_id from list of modules:
+Generate event_id list from list of modules. The given modules matches the start of the module codes in the spreasheet. For example, 'CS' would match all module codes beginnng with cs.
 ```
 python3 getevents.py "spreadsheet path" module ... -o "output file"
 ```
 
-Generate timetable from list of events:
+
+Generate timetable from event_id list:
 ```
 python3 createtable.py "spreadsheet path" "event_id path" -o "output.html"
 ```
