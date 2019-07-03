@@ -11,7 +11,7 @@ class Event:
         self.id = row[0]
         self.modules = row[1]
         self.type = row[2]
-        self.group = str(row[3])
+        self.group = row[3]
         self.day = row[4]
         self.time = row[5]
         self.length = row[6]
@@ -50,7 +50,7 @@ class Event:
         return self.same_time_module_as(event) and self.room == event.room
 
     def same_time_module_as(self, event):
-        return self.start_time == event.start_time and self.end_time == event.end_time and self._modules == event._modules
+        return self.start_time == event.start_time and self.end_time == event.end_time and self._modules == event._modules and self.group == event.group
 
     def merge_weeks(self,event):
         self._modules.update(event._modules)
@@ -174,7 +174,10 @@ class Timetable:
                                     continue
                                 if cell:
                                     with tag('td', bgcolor=cellbg, colspan=cell.span, rowspan=1):
-                                        Timetable.create_table(cell.modules,tag,line,cellbg)
+                                        text = cell.modules + " " + cell.type
+                                        if cell.group:
+                                            text+=" " + str(cell.group)
+                                        Timetable.create_table(text,tag,line,cellbg)
                                         for room,week in cell.info:
                                             Timetable.create_table(room,tag,line,cellbg)
                                             Timetable.create_table(week,tag,line,cellbg)
