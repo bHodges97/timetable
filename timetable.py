@@ -25,7 +25,7 @@ class Event:
         self.start_time = time_to_minute(self.time)
         self.end_time = self.start_time + str_to_minute(self.length)
         self._modules = set(self.modules.split(','))
-        self.additional = []
+        self.info = []
 
     def __lt__(self, other):
         return self.start_time < other.start_time
@@ -58,18 +58,23 @@ class Event:
         self.weeks += "," + event.weeks
 
     def merge_rooms(self,event):
-        for i in range(0, len(self.additional), 2):
-            if self.additional[i] == event.room:
-                self.additional[i+1] += "," + event.weeks
+        for combo in self.info:
+            if combo[0] == event.room:
+                combo[1] += "," + event.weeks
                 return
 
-        self.additional.append(event.room)
-        self.additional.append(event.weeks)
+        self.info.append([event.room,event.weeks])
+
+    def sort_contents(self):
+        self.info.append([self.room,self.weeks])
+        for combo in self.info:
+            combo[1] = Event.sort_weeks(combo[1])
+        self.info.sort(key = lambda x:int(x[1].split(",")[0].split("-")[0]))
 
     def sort_weeks(weeks):
         terms = weeks.split(",")
-
-
+        terms.sort(key=lambda x:int(x.split('-')[0]))
+        return ",".join(terms)
 
 
 class Timetable:
@@ -130,6 +135,10 @@ class Timetable:
 
             for cells in cell_list:
                 self.bins.append((day,cells))
+        for day,cells in self.bins:
+            for event in set(cells):
+                if event:
+                    event.sort_contents()
 
         self.headers = headers
 
@@ -165,20 +174,10 @@ class Timetable:
                                     continue
                                 if cell:
                                     with tag('td', bgcolor=cellbg, colspan=cell.span, rowspan=1):
-                                        with tag('table', bgcolor=cellbg, cellspacing=0, border=0, width='100%'):
-                                            with tag('tr'):
-                                                line('td',cell.modules,align='left')
-                                        with tag('table', bgcolor=cellbg, cellspacing=0, border=0, width='100%'):
-                                            with tag('tr'):
-                                                line('td',cell.room,align='left')
-                                        with tag('table', bgcolor=cellbg, cellspacing=0, border=0, width='100%'):
-                                            with tag('tr'):
-                                                line('td',str(cell.weeks),align='left')
-                                        for additional in cell.additional:
-                                            with tag('table', bgcolor=cellbg, cellspacing=0, border=0, width='100%'):
-                                                with tag('tr'):
-                                                    line('td',additional,align='left')
-
+                                        Timetable.create_table(cell.modules,tag,line,cellbg)
+                                        for room,week in cell.info:
+                                            Timetable.create_table(room,tag,line,cellbg)
+                                            Timetable.create_table(week,tag,line,cellbg)
                                     skip = cell.span-1
                                 else:
                                     with tag('td'):
@@ -186,13 +185,13 @@ class Timetable:
 
                     doc.asis('<!--END ROW OUTPUT-->')
 
-
-
-
-
-
-
         return indent(doc.getvalue())
+
+    def create_table(text,tag,line,cellbg):
+        with tag('table', bgcolor=cellbg, cellspacing=0, border=0, width='100%'):
+            with tag('tr'):
+                line('td', text, align='left')
+
 
 def matches(string, patterns):
     return any(string.startswith(pattern) for pattern in patterns)
