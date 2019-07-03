@@ -11,11 +11,11 @@ class Event:
         self.id = row[0]
         self.modules = row[1]
         self.type = row[2]
-        self.group = row[3]
+        self.group = str(row[3])
         self.day = row[4]
         self.time = row[5]
         self.length = row[6]
-        self.weeks = row[7]
+        self.weeks = str(row[7])
         self.room = row[8]
         self.string_data = row[9]
         self.room_pool = row[10]
@@ -24,7 +24,8 @@ class Event:
 
         self.start_time = time_to_minute(self.time)
         self.end_time = self.start_time + str_to_minute(self.length)
-        self._modules = self.modules.split(',')
+        self._modules = set(self.modules.split(','))
+        self.additional = []
 
     def __lt__(self, other):
         return self.start_time < other.start_time
@@ -32,26 +33,40 @@ class Event:
     def get_modules(self):
         return self._modules
 
-    def overlaps(self, module):
+    def overlaps(self, event):
         #stackoverflow 325933
-        return max(self.start_time, module.start_time) < min(self.end_time,module.end_time)
+        return max(self.start_time, event.start_time) < min(self.end_time, event.end_time)
 
     def span(self,headers):
-        start = 0
-        end = 0
         for i in range(len(headers)):
             if self.start_time == headers[i]:
-                start = i
+                self.start = i
             elif self.end_time == headers[i]:
-                end = i
-        assert end-start > 0
-        return end-start
+                self.end = i
+        self.span = self.end-self.start
+        return self.span
+
+    def same_time_module_and_room(self, event):
+        return self.same_time_module_as(event) and self.room == event.room
+
+    def same_time_module_as(self, event):
+        return self.start_time == event.start_time and self.end_time == event.end_time and self._modules == event._modules
+
+    def merge_weeks(self,event):
+        self._modules.update(event._modules)
+        self.module = ",".join(self._modules)
+        self.weeks = self.weeks + "," + event.weeks
+
+    def merge_rooms(self,event):
+        self.additional.append(" ")
+        self.additional.append(event.room)
+        self.additional.append(event.weeks)
+
 
 class Timetable:
     def __init__(self, path):
         self.timetable = pyxl.load_workbook(paths[2], read_only = True, data_only = True).active
         self.days = ("Mon","Tue","Wed","Thu","Fri","Sat","Sun")
-        self.bins = {day:[] for day in self.days}
 
 
     def generate_event_list(self,codes):
@@ -65,17 +80,50 @@ class Timetable:
     def load_events(self,eventlist):
         headers = set()
         eventlist = sorted(eventlist)
+        bins = {day:[] for day in self.days}
+
         for row in self.timetable.iter_rows(min_row=2,values_only=True):
             if row[0] in eventlist:
                 if not row[4] or not row[5] or not row[8]:
                     print("Warning: Missing date/time/room info for event id",row[0])
                     continue
                 event = Event(row)
-                self.bins[event.day].append(event)
+                bins[event.day].append(event)
                 headers.update((event.start_time,event.end_time))
-        self.headers = sorted(headers)
-        for bin in self.bins.values():
-            bin.sort()
+
+        headers = sorted(headers)
+        self.bins = []
+        for day in self.days:
+            bins[day].sort()
+            cell_list = [[None] * (len(headers) - 1)]
+            for event in bins[day]:
+                event.span(headers)
+                slotted = False
+                i = 0
+                while not slotted:
+                    cells = cell_list[i]
+                    #slot into time table if time slot empty
+                    if cells[event.start] == None:
+                        for i in range(event.start,event.end):
+                            cells[i] = event
+                        slotted = True
+                    #if in same room, mege
+                    elif cells[event.start].same_time_module_and_room(event):
+                        cells[event.start].merge_weeks(event)
+                        slotted = True
+                    elif cells[event.start].same_time_module_as(event):
+                        cells[event.start].merge_rooms(event)
+                        slotted = True
+                    else:
+                        i+=1
+                        if len(cell_list) == i:
+                            cell_list.append([None] * (len(headers) -1))
+
+            for cells in cell_list:
+                self.bins.append((day,cells))
+
+        self.headers = headers
+
 
 
     def create_timetable(self, eventlist, headerbg = '#C0C0C0', headerfont = '#000000', cellbg = '#00FFFF', cellfont = '#000000'):
@@ -87,6 +135,7 @@ class Timetable:
                 line('title','Time Table Test')
             with tag('body'):
                 with tag('table', cellspacing=0, border=1):
+
                     doc.asis('<!-- START COLUMNS HEADERS-->')
                     with tag('tr'):
                         line('td','')
@@ -94,36 +143,39 @@ class Timetable:
                             with tag('td', bgcolor=headerbg, colspan=1):
                                 line('font', str(minute_to_time(header))[:5], color=headerfont)
                     doc.asis('<!-- END COLUMNS HEADERS-->')
+
                     doc.asis('<!--START ROW OUTPUT-->')
-                    for day in self.days:
+                    for day,cells in self.bins:
                         with tag('tr'):
                             with tag('td', bgcolor=headerbg, rowspan=1):
                                 line('font',day,color=headerfont)
-                            index = 0
-                            for i in range(len(self.headers)-1):
-                                if index != i:
+                            skip = 0
+                            for cell in cells:
+                                if skip:
+                                    skip-=1
                                     continue
-                                header = self.headers[i]
-                                events = [x for x in self.bins[day] if x.start_time == header]
-                                if events:
-                                    #TODO: Handle overlaps
-                                    event = events[0]
-                                    span = event.span(self.headers)
-                                    with tag('td', bgcolor=cellbg, colspan=span, rowspan=1):
+                                if cell:
+                                    with tag('td', bgcolor=cellbg, colspan=cell.span, rowspan=1):
                                         with tag('table', bgcolor=cellbg, cellspacing=0, border=0, width='100%'):
                                             with tag('tr'):
-                                                line('td',event.modules,align='left')
+                                                line('td',cell.modules,align='left')
                                         with tag('table', bgcolor=cellbg, cellspacing=0, border=0, width='100%'):
                                             with tag('tr'):
-                                                line('td',event.room,align='left')
+                                                line('td',cell.room,align='left')
                                         with tag('table', bgcolor=cellbg, cellspacing=0, border=0, width='100%'):
                                             with tag('tr'):
-                                                line('td',str(event.weeks),align='left')
-                                    index+=span
+                                                line('td',str(cell.weeks),align='left')
+                                        for additional in cell.additional:
+                                            with tag('table', bgcolor=cellbg, cellspacing=0, border=0, width='100%'):
+                                                with tag('tr'):
+                                                    line('td',additional,align='left')
+
+                                    skip = cell.span-1
                                 else:
-                                    index+=1
                                     with tag('td'):
                                         doc.asis('&nbsp')
+
+                    doc.asis('<!--END ROW OUTPUT-->')
 
 
 
@@ -148,6 +200,6 @@ if __name__ == "__main__":
     list = t.generate_event_list(["CS1"])
 
     out = t.create_timetable(list)
-    with open ('timtable.html','w') as f:
+    with open ('timetable.html','w') as f:
         f.write(out)
     #get_info(paths[2])
