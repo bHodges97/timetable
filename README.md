@@ -1,13 +1,13 @@
-# timetable maker
+# Timetable
 Creates HTML timetable.
 
 ## Installation
 ```
-pip install -r requirements.txt
+pip3 install -r requirements.txt
 ```
 
 ## Usage
-Generate event_id list from list of modules. The given modules matches the start of the module codes in the spreasheet. For example, 'CS' would match all module codes beginnng with cs.
+Generate event_id list from list of modules. The given modules matches the start of the module codes in the spreasheet. For example, 'CS' would match all module codes beginnng with CS.
 ```
 python3 getevents.py "spreadsheet path" module ... -o "output file"
 ```
@@ -20,6 +20,13 @@ python3 createtable.py "spreadsheet path" "event_id path" -o "output.html"
 
 
 ## Issues
+Notes:
+- Room pool
+- String data
+- Weeks field contains dates, dates have inconsistent formating(dd/mm and mm/dd)
+
+Room capacity list:
+  PALMERFOYER, PAL
 
 Missing room capacity for:
 * L33-G11

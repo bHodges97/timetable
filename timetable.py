@@ -143,10 +143,16 @@ class Timetable:
 
         self.headers = headers
 
+    def list_modules(self):
+        modules = set()
+        for row in self.timetable.iter_rows(min_row=2,values_only=True):
+            if row[1]:
+                m = str(row[1]).split(",")
+                modules.update(m)
+        modules = sorted(modules)
+        return modules
 
-
-    def create_timetable(self, eventlist, headerbg = '#C0C0C0', headerfont = '#000000', cellbg = '#00FFFF', cellfont = '#000000'):
-        self.load_events(eventlist)
+    def create_timetable(self, headerbg = '#C0C0C0', headerfont = '#000000', cellbg = '#00FFFF', cellfont = '#000000'):
         doc, tag, text, line = Doc().ttl()
         doc.asis('<!DOCTYPE html>')
         with tag('html'):
@@ -163,14 +169,14 @@ class Timetable:
                                 line('font', str(minute_to_time(header))[:5], color=headerfont)
                     doc.asis('<!-- END COLUMNS HEADERS-->')
 
-                    doc.asis('<!--START ROW OUTPUT-->')
                     for day,cells in self.bins:
+                        doc.asis('<!--START ROW '+day+'-->')
                         with tag('tr'):
                             with tag('td', bgcolor=headerbg, rowspan=1):
                                 line('font',day,color=headerfont)
                             skip = 0
                             for cell in cells:
-                                if skip:
+                                if skip:#accomodate multicell events
                                     skip-=1
                                     continue
                                 if cell:
@@ -183,11 +189,11 @@ class Timetable:
                                             Timetable.create_table(room,tag,line,cellbg)
                                             Timetable.create_table(week,tag,line,cellbg)
                                     skip = cell.span-1
-                                else:
+                                else:#empty cell
                                     with tag('td'):
                                         doc.asis('&nbsp')
+                        doc.asis('<!--END ROW '+day+'-->')
 
-                    doc.asis('<!--END ROW OUTPUT-->')
 
         return indent(doc.getvalue())
 
@@ -209,9 +215,10 @@ if __name__ == "__main__":
 
     #timetable = pyxl.load_workbook(paths[2]).active
     t = Timetable(paths[2])
-    list = t.generate_event_list(["CS1"])
+    eventlist = t.generate_event_list(["CS1"])
+    t.load_events(eventlist)
 
-    out = t.create_timetable(list)
+    out = t.create_timetable()
     with open ('timetable.html','w') as f:
         f.write(out)
     #get_info(paths[2])

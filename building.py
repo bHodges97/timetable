@@ -4,9 +4,10 @@ import openpyxl as pyxl
 import geopy.distance
 
 class Building:
-    def __init__(self, name, lattitude, longitude):
+    def __init__(self, name, lattitude, longitude, alias):
         self.name = name
         self.coords = (lattitude,longitude)
+        self.alias = alias
 
     def add_room(self, room, capacity):
         self.room = room
@@ -14,6 +15,9 @@ class Building:
 
     def distance_to(self, building):
         return geopy.distance.distance(self.coords,building.coords).m
+
+    def __str__(self):
+        return self.name
 
 class Room:
     def __init__(self, name, building,capacity):
@@ -73,14 +77,20 @@ def distance_matrix(buildings):
     #print(distances)
     return distances
 
+def get_building(room, buildings):
+    for key,value in buildings.items():
+        if room.startswith(key):
+            return value
+
 def load_buildings(path):
     buildings = dict()
     with open(path,'r') as f:
         reader = csv.reader(f)
         next(reader,None)#skip header
-        for name,lattitude,longitude in reader:
-            building = Building(name,lattitude,longitude)
+        for name,lattitude,longitude,alias in reader:
+            building = Building(name,lattitude,longitude,alias)
             buildings[name] = building
+            buildings[alias] = building
     return buildings
 
 def load_rooms(rooms_path, equip_path, buildings):

@@ -13,7 +13,8 @@ if __name__ == "__main__":
     t = Timetable(args.path1)
     with open(args.path2,'r') as f:
         events = f.read().splitlines()
-        out = t.create_timetable(events)
+        t.load_events(events)
+        out = t.create_timetable()
 
         if args.o:
             with open(args.o,'w') as f1:
