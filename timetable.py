@@ -79,7 +79,7 @@ class Event:
 
 class Timetable:
     def __init__(self, path):
-        self.timetable = pyxl.load_workbook(paths[2], read_only = True, data_only = True).active
+        self.timetable = pyxl.load_workbook(path, read_only = True, data_only = True).active
         self.days = ("Mon","Tue","Wed","Thu","Fri","Sat","Sun")
 
 
