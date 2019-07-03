@@ -55,12 +55,21 @@ class Event:
     def merge_weeks(self,event):
         self._modules.update(event._modules)
         self.module = ",".join(self._modules)
-        self.weeks = self.weeks + "," + event.weeks
+        self.weeks += "," + event.weeks
 
     def merge_rooms(self,event):
-        self.additional.append(" ")
+        for i in range(0, len(self.additional), 2):
+            if self.additional[i] == event.room:
+                self.additional[i+1] += "," + event.weeks
+                return
+
         self.additional.append(event.room)
         self.additional.append(event.weeks)
+
+    def sort_weeks(weeks):
+        terms = weeks.split(",")
+
+
 
 
 class Timetable:
