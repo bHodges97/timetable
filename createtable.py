@@ -14,7 +14,7 @@ if __name__ == "__main__":
     with open(args.path2,'r') as f:
         events = f.read().splitlines()
         t.load_events(events)
-        out = t.create_timetable()
+        out = t.render_html()
 
         if args.o:
             with open(args.o,'w') as f1:

@@ -4,7 +4,6 @@ import os
 
 
 if __name__ == "__main__":
-
     files = ["Room List.xlsx", "Roomequip.xlsx", "Timetable2018-19.xlsx","buildings.csv"]
     paths = [os.path.join("Data",x) for x in files]
     buildings = load_buildings(paths[3])

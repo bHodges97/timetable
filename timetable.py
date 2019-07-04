@@ -6,17 +6,34 @@ from timeutils import *
 from yattag import Doc
 from yattag import indent
 
+class TimeSlot:
+    def __init__(self,event):
+        self.events = [event]
+
+    def add(self,event):
+        self.events.append(event)
+
+    def sort(self):
+        if self.events[0]:
+            self.events.sort(key = lambda x: 1000 if x.date else min(x.weeks))
+
+    def matches(self, event):
+        if self.events[0]:
+            return self.events[0].same_except_room(event)
 
 class Event:
     def __init__(self,row):
         self.id = row[0]
-        self.modules = row[1]
+        self.modules = set(str(row[1]).split(','))
         self.type = row[2]
-        self.group = row[3]
+        if row[3]:
+            self.group = set(str(row[3]).split(','))
+        else:
+            self.group = set()
         self.day = row[4]
         self.time = row[5]
         self.length = row[6]
-        self.weeks = str(row[7])
+        self._init_weeks(row[7]) # weeks is set object for each week number
         self.room = row[8]
         self.string_data = row[9]
         self.room_pool = row[10]
@@ -25,14 +42,9 @@ class Event:
 
         self.start_time = time_to_minute(self.time)
         self.end_time = self.start_time + str_to_minute(self.length)
-        self._modules = set(self.modules.split(','))
-        self.info = []
 
     def __lt__(self, other):
         return self.start_time < other.start_time
-
-    def get_modules(self):
-        return self._modules
 
     def overlaps(self, event):
         #stackoverflow 325933
@@ -47,42 +59,75 @@ class Event:
         self.span = self.end-self.start
         return self.span
 
-    def same_time_module_and_room(self, event):
-        return self.same_time_module_as(event) and self.room == event.room
+    def can_merge_with(self, event):
+        if event:
+            return self.same_except_room(event) and self.room == event.room
 
-    def same_time_module_as(self, event):
-        return self.start_time == event.start_time and self.end_time == event.end_time and self._modules == event._modules and self.group == event.group
+    def same_except_room(self, event):
+        return self.start_time == event.start_time and self.end_time == event.end_time and self.modules == event.modules and self.group == event.group and self.type == event.type and self.day == event.day
+
+    def _init_weeks(self, data):
+        self.weeks = set()
+        self.date = set()
+        if isinstance(data,datetime):
+            self.date.add(str(data.date()))#strftime("%b-%d")
+            return
+
+        weeks_strs = str(data).split(",")
+        for weeks in weeks_strs:
+            terms = list(map(int,weeks.split("-")))
+            if len(terms) == 1:
+                self.weeks.add(terms[0])
+            else:
+                self.weeks.update(set(range(terms[0],terms[1]+1)))
 
     def merge_weeks(self,event):
-        self._modules.update(event._modules)
-        self.module = ",".join(self._modules)
-        self.weeks += "," + event.weeks
+        self.weeks.update(event.weeks)
+        self.date.update(event.date)
 
-    def merge_rooms(self,event):
-        for combo in self.info:
-            if combo[0] == event.room:
-                combo[1] += "," + event.weeks
-                return
+    def weeks_str(self):
+        out = ""
+        weeks = sorted(self.weeks)
+        if self.weeks:
+            last = weeks[0]
+            out = str(last)
+            if len(self.weeks) > 1:
+                weeks.append(0)#fixes tail
+                for i in range(1,len(weeks)):
+                    if weeks[i] != weeks[i-1]+1:
+                        if last != weeks[i-1]:
+                            out+= "-" + str(weeks[i-1])
+                        out+= "," + str(weeks[i])
+                        last=weeks[i]
+                out = out[:-2]
+        dates = self.date_str()
+        return out + " " + dates
 
-        self.info.append([event.room,event.weeks])
+    def date_str(self):
+        date = sorted(self.date)
+        dates = ""
+        if date:
+            dates+=str(date[0])
+            for date in date[1:]:
+                dates+=","+str(date)
+        return dates
 
-    def sort_contents(self):
-        self.info.append([self.room,self.weeks])
-        for combo in self.info:
-            combo[1] = Event.sort_weeks(combo[1])
-        self.info.sort(key = lambda x:int(x[1].split(",")[0].split("-")[0]))
+    def modules_str(self):
+        if self.modules:
+            return ",".join(self.modules)
+        else:
+            return ""
 
-    def sort_weeks(weeks):
-        terms = weeks.split(",")
-        terms.sort(key=lambda x:int(x.split('-')[0]))
-        return ",".join(terms)
-
+    def groups_str(self):
+        if self.group:
+            return ",".join(self.group)
+        else:
+            return ""
 
 class Timetable:
     def __init__(self, path):
         self.timetable = pyxl.load_workbook(path, read_only = True, data_only = True).active
         self.days = ("Mon","Tue","Wed","Thu","Fri","Sat","Sun")
-
 
     def generate_event_list(self,codes):
         eventlist = set()
@@ -93,20 +138,32 @@ class Timetable:
         return list(eventlist)
 
     def load_events(self,eventlist):
-        headers = set()
         eventlist = sorted(eventlist)
-        bins = {day:[] for day in self.days}
-
+        events = []
+        #load events from excel
         for row in self.timetable.iter_rows(min_row=2,values_only=True):
             if row[0] in eventlist:
                 if not row[4] or not row[5] or not row[8]:
                     print("Warning: Missing date/time/room info for event id",row[0])
                     continue
                 event = Event(row)
-                bins[event.day].append(event)
-                headers.update((event.start_time,event.end_time))
+                for e in events:
+                    if event.can_merge_with(e):
+                        e.weeks.update(event.weeks)
+                        event = None
+                        break
+                if event:
+                    events.append(event)
+        self.events = events
 
+    def create_timetable(self):
+        bins = {day:[] for day in self.days}
+        headers = set()
+        for event in self.events:
+            bins[event.day].append(event)
+            headers.update((event.start_time,event.end_time))
         headers = sorted(headers)
+
         self.bins = []
         for day in self.days:
             bins[day].sort()
@@ -117,30 +174,24 @@ class Timetable:
                 i = 0
                 while not slotted:
                     cells = cell_list[i]
-                    #slot into time table if time slot empty
+                    #slot into time table if there is space
                     if cells[event.start] == None:
-                        for i in range(event.start,event.end):
-                            cells[i] = event
+                        cells[event.start]= TimeSlot(event)
+                        for i in range(event.start+1,event.end):
+                            cells[i] = TimeSlot(None)
                         slotted = True
-                    #if in same room, mege
-                    elif cells[event.start].same_time_module_and_room(event):
-                        cells[event.start].merge_weeks(event)
+                    #if different type/group add to info
+                    elif cells[event.start].matches(event):
+                        cells[event.start].add(event)
                         slotted = True
-                    elif cells[event.start].same_time_module_as(event):
-                        cells[event.start].merge_rooms(event)
-                        slotted = True
-                    else:
+                    else:#if in conflict add a new row
                         i+=1
                         if len(cell_list) == i:
                             cell_list.append([None] * (len(headers) -1))
 
             for cells in cell_list:
+                [c.sort() for c in cells if c]
                 self.bins.append((day,cells))
-        for day,cells in self.bins:
-            for event in set(cells):
-                if event:
-                    event.sort_contents()
-
         self.headers = headers
 
     def list_modules(self):
@@ -152,7 +203,8 @@ class Timetable:
         modules = sorted(modules)
         return modules
 
-    def create_timetable(self, headerbg = '#C0C0C0', headerfont = '#000000', cellbg = '#00FFFF', cellfont = '#000000'):
+    def render_html(self, headerbg = '#C0C0C0', headerfont = '#000000', cellbg = '#00FFFF', cellfont = '#000000'):
+        self.create_timetable()
         doc, tag, text, line = Doc().ttl()
         doc.asis('<!DOCTYPE html>')
         with tag('html'):
@@ -169,26 +221,23 @@ class Timetable:
                                 line('font', str(minute_to_time(header))[:5], color=headerfont)
                     doc.asis('<!-- END COLUMNS HEADERS-->')
 
-                    for day,cells in self.bins:
+                    for day,row in self.bins:
                         doc.asis('<!--START ROW '+day+'-->')
                         with tag('tr'):
                             with tag('td', bgcolor=headerbg, rowspan=1):
                                 line('font',day,color=headerfont)
-                            skip = 0
-                            for cell in cells:
-                                if skip:#accomodate multicell events
-                                    skip-=1
-                                    continue
+                            for cell in row:
                                 if cell:
-                                    with tag('td', bgcolor=cellbg, colspan=cell.span, rowspan=1):
-                                        text = cell.modules + " " + cell.type
-                                        if cell.group:
-                                            text+=" " + str(cell.group)
+                                    event = cell.events[0]
+                                    if not event:
+                                        continue
+                                    with tag('td', bgcolor=cellbg, colspan=event.span, rowspan=1):
+                                        text = event.modules_str() + " " + event.type
+                                        text += " " + event.groups_str()
                                         Timetable.create_table(text,tag,line,cellbg)
-                                        for room,week in cell.info:
-                                            Timetable.create_table(room,tag,line,cellbg)
-                                            Timetable.create_table(week,tag,line,cellbg)
-                                    skip = cell.span-1
+                                        for e in cell.events:
+                                            Timetable.create_table(e.room,tag,line,cellbg)
+                                            Timetable.create_table(e.weeks_str(),tag,line,cellbg)
                                 else:#empty cell
                                     with tag('td'):
                                         doc.asis('&nbsp')
@@ -201,6 +250,31 @@ class Timetable:
         with tag('table', bgcolor=cellbg, cellspacing=0, border=0, width='100%'):
             with tag('tr'):
                 line('td', text, align='left')
+
+    def some_metrics(self, eventlist, buildinglist):
+        eventlist = sorted(eventlist)
+        days = {day:[] for day in self.days}
+        events = []
+        groups = dict()
+
+        for row in self.timetable.iter_rows(min_row=2,values_only=True):
+            if row[0] in eventlist:
+                if not row[4] or not row[5] or not row[8]:
+                    print("Warning: Missing date/time/room info for event id",row[0],row[4],row[5],row[8])
+                    continue
+                event = Event(row)
+                events.append(event)
+                days[event.day].append(event)
+                if not module in groups:
+                    groups[module] = set()
+                if event.group:
+                    for module in event.modules:
+                        groups[module].add
+
+        print(modules)
+        #get all module codes and group combos
+
+
 
 
 def matches(string, patterns):
@@ -218,7 +292,7 @@ if __name__ == "__main__":
     eventlist = t.generate_event_list(["CS1"])
     t.load_events(eventlist)
 
-    out = t.create_timetable()
+    out = t.render_html()
     with open ('timetable.html','w') as f:
         f.write(out)
     #get_info(paths[2])
