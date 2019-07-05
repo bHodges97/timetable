@@ -3,8 +3,7 @@ import numpy as np
 import openpyxl as pyxl
 from building import *
 from timeutils import *
-from yattag import Doc
-from yattag import indent
+from yattag import Doc,indent
 
 class TimeSlot:
     def __init__(self,event):
@@ -127,19 +126,19 @@ class Event:
 class Timetable:
     def __init__(self, path):
         self.timetable = pyxl.load_workbook(path, read_only = True, data_only = True).active
-        self.days = ("Mon","Tue","Wed","Thu","Fri","Sat","Sun")
+        self.days = {day:[] for day in ("Mon","Tue","Wed","Thu","Fri","Sat","Sun")}
+        self.events = []
 
     def generate_event_list(self,codes):
         eventlist = set()
         for row in self.timetable.iter_rows(min_row=2,values_only=True):
             module = str(row[1])
-            if module and any(matches(x,codes) for x in module.split(',')):
+            if module and any(Timetable.matches(x,codes) for x in module.split(',')):
                 eventlist.add(row[0])
         return list(eventlist)
 
     def load_events(self,eventlist):
         eventlist = sorted(eventlist)
-        events = []
         #load events from excel
         for row in self.timetable.iter_rows(min_row=2,values_only=True):
             if row[0] in eventlist:
@@ -147,28 +146,28 @@ class Timetable:
                     print("Warning: Missing date/time/room info for event id",row[0])
                     continue
                 event = Event(row)
-                for e in events:
+                for e in self.days[row[4]]:
                     if event.can_merge_with(e):
                         e.weeks.update(event.weeks)
                         event = None
                         break
                 if event:
-                    events.append(event)
-        self.events = events
+                    self.events.append(event)
+                    self.days[event.day].append(event)
+        for row in self.days.values():
+            row.sort()
 
     def create_timetable(self):
-        bins = {day:[] for day in self.days}
         headers = set()
         for event in self.events:
-            bins[event.day].append(event)
             headers.update((event.start_time,event.end_time))
         headers = sorted(headers)
 
-        self.bins = []
-        for day in self.days:
-            bins[day].sort()
+        self.rows = []
+        for day,row in self.days.items():
+            row.sort()
             cell_list = [[None] * (len(headers) - 1)]
-            for event in bins[day]:
+            for event in row:
                 event.span(headers)
                 slotted = False
                 i = 0
@@ -191,7 +190,7 @@ class Timetable:
 
             for cells in cell_list:
                 [c.sort() for c in cells if c]
-                self.bins.append((day,cells))
+                self.rows.append((day,cells))
         self.headers = headers
 
     def list_modules(self):
@@ -212,7 +211,6 @@ class Timetable:
                 line('title','Time Table Test')
             with tag('body'):
                 with tag('table', cellspacing=0, border=1):
-
                     doc.asis('<!-- START COLUMNS HEADERS-->')
                     with tag('tr'):
                         line('td','')
@@ -221,7 +219,7 @@ class Timetable:
                                 line('font', str(minute_to_time(header))[:5], color=headerfont)
                     doc.asis('<!-- END COLUMNS HEADERS-->')
 
-                    for day,row in self.bins:
+                    for day,row in self.rows:
                         doc.asis('<!--START ROW '+day+'-->')
                         with tag('tr'):
                             with tag('td', bgcolor=headerbg, rowspan=1):
@@ -251,34 +249,25 @@ class Timetable:
             with tag('tr'):
                 line('td', text, align='left')
 
-    def some_metrics(self, eventlist, buildinglist):
-        eventlist = sorted(eventlist)
-        days = {day:[] for day in self.days}
-        events = []
+    def some_metrics(self, buildinglist):
         groups = dict()
 
-        for row in self.timetable.iter_rows(min_row=2,values_only=True):
-            if row[0] in eventlist:
-                if not row[4] or not row[5] or not row[8]:
-                    print("Warning: Missing date/time/room info for event id",row[0],row[4],row[5],row[8])
-                    continue
-                event = Event(row)
-                events.append(event)
-                days[event.day].append(event)
+        for event in self.events:
+            for module in event.modules:
                 if not module in groups:
                     groups[module] = set()
                 if event.group:
                     for module in event.modules:
-                        groups[module].add
+                        groups[module].update(event.group)
 
-        print(modules)
+        print(groups.values())
+        for i in self.days["Mon"]:
+            print(i.start_time)
         #get all module codes and group combos
 
 
-
-
-def matches(string, patterns):
-    return any(string.startswith(pattern) for pattern in patterns)
+    def matches(string, patterns):
+        return any(string.startswith(pattern) for pattern in patterns)
 
 if __name__ == "__main__":
     files = ["Room List.xlsx", "Roomequip.xlsx", "Timetable2018-19.xlsx","buildings.csv"]

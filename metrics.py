@@ -2,6 +2,28 @@ from timetable import Timetable
 from building import *
 import os
 
+class TimetableMetrics():
+    def __init__(self, timetable, buildings):
+        self.table = timetable
+        self.buildings = buildings
+
+    def some_metrics(self):
+        groups = dict()
+
+        for event in table.events:
+            for module in event.modules:
+                if not module in groups:
+                    groups[module] = set()
+                if event.group:
+                    for module in event.modules:
+                        groups[module].update(event.group)
+
+        print(groups.values())
+        for i in table.days["Mon"]:
+            print(i.start_time)
+        #get all module codes and group combos
+
+
 
 if __name__ == "__main__":
 
@@ -15,4 +37,6 @@ if __name__ == "__main__":
     test = ['CS1']
     events = timetable.generate_event_list(test)
     timetable.load_events(events)
-    timetable.some_metrics(events, buildings)
+    m = TimetableMetrics(timetable,buildings)
+    m.some_metrics(buildings)
+
