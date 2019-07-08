@@ -26,9 +26,9 @@ class Event:
         self.modules = set(str(row[1]).split(','))
         self.type = row[2]
         if row[3]:
-            self.group = set(str(row[3]).split(','))
+            self.groups = set(str(row[3]).split(','))
         else:
-            self.group = set()
+            self.groups = set()
         self.day = row[4]
         self.time = row[5]
         self.length = row[6]
@@ -49,11 +49,17 @@ class Event:
         #stackoverflow 325933
         return max(self.start_time, event.start_time) < min(self.end_time, event.end_time)
 
-    def span(self,headers):
-        for i in range(len(headers)):
-            if self.start_time == headers[i]:
+    def conflicts(self, event):
+        if self.overlaps(event):
+            #different room and group
+            return self.room != event.room and not self.groups.isdisjoint(event.groups)
+        return False
+
+    def col_span(self,headers):
+        for i,header in enumerate(headers):
+            if self.start_time == header:
                 self.start = i
-            elif self.end_time == headers[i]:
+            elif self.end_time == header:
                 self.end = i
         self.span = self.end-self.start
         return self.span
@@ -63,7 +69,7 @@ class Event:
             return self.same_except_room(event) and self.room == event.room
 
     def same_except_room(self, event):
-        return self.start_time == event.start_time and self.end_time == event.end_time and self.modules == event.modules and self.group == event.group and self.type == event.type and self.day == event.day
+        return self.start_time == event.start_time and self.end_time == event.end_time and self.modules == event.modules and self.groups == event.groups and self.type == event.type and self.day == event.day
 
     def _init_weeks(self, data):
         self.weeks = set()
@@ -118,16 +124,22 @@ class Event:
             return ""
 
     def groups_str(self):
-        if self.group:
-            return ",".join(self.group)
+        if self.groups:
+            return ",".join(self.groups)
         else:
             return ""
+
+    def __str__(self):
+        attr = map(str,[self.modules_str(),self.type,self.groups_str(),self.room,self.day,self.start,self.length,self.weeks_str()])
+        return ",".join(attr)
+
 
 class Timetable:
     def __init__(self, path):
         self.timetable = pyxl.load_workbook(path, read_only = True, data_only = True).active
         self.days = {day:[] for day in ("Mon","Tue","Wed","Thu","Fri","Sat","Sun")}
         self.events = []
+        self.headers = []
 
     def generate_event_list(self,codes):
         eventlist = set()
@@ -138,8 +150,9 @@ class Timetable:
         return list(eventlist)
 
     def load_events(self,eventlist):
-        eventlist = sorted(eventlist)
+        headers = set()
         #load events from excel
+        i = 0
         for row in self.timetable.iter_rows(min_row=2,values_only=True):
             if row[0] in eventlist:
                 if not row[4] or not row[5] or not row[8]:
@@ -150,25 +163,24 @@ class Timetable:
                     if event.can_merge_with(e):
                         e.weeks.update(event.weeks)
                         event = None
+                        i+=1
                         break
-                if event:
+                if event != None:
                     self.events.append(event)
                     self.days[event.day].append(event)
+                    headers.update((event.start_time,event.end_time))
         for row in self.days.values():
             row.sort()
+        self.headers = sorted(headers)
+        for event in self.events:
+            event.col_span(self.headers)
 
     def create_timetable(self):
-        headers = set()
-        for event in self.events:
-            headers.update((event.start_time,event.end_time))
-        headers = sorted(headers)
-
         self.rows = []
         for day,row in self.days.items():
             row.sort()
-            cell_list = [[None] * (len(headers) - 1)]
+            cell_list = [[None] * (len(self.headers) - 1)]
             for event in row:
-                event.span(headers)
                 slotted = False
                 i = 0
                 while not slotted:
@@ -179,19 +191,18 @@ class Timetable:
                         for i in range(event.start+1,event.end):
                             cells[i] = TimeSlot(None)
                         slotted = True
-                    #if different type/group add to info
+                    #if different type/group add to time slot
                     elif cells[event.start].matches(event):
                         cells[event.start].add(event)
                         slotted = True
                     else:#if in conflict add a new row
                         i+=1
                         if len(cell_list) == i:
-                            cell_list.append([None] * (len(headers) -1))
+                            cell_list.append([None] * (len(self.headers) -1))
 
             for cells in cell_list:
                 [c.sort() for c in cells if c]
                 self.rows.append((day,cells))
-        self.headers = headers
 
     def list_modules(self):
         modules = set()
@@ -248,23 +259,6 @@ class Timetable:
         with tag('table', bgcolor=cellbg, cellspacing=0, border=0, width='100%'):
             with tag('tr'):
                 line('td', text, align='left')
-
-    def some_metrics(self, buildinglist):
-        groups = dict()
-
-        for event in self.events:
-            for module in event.modules:
-                if not module in groups:
-                    groups[module] = set()
-                if event.group:
-                    for module in event.modules:
-                        groups[module].update(event.group)
-
-        print(groups.values())
-        for i in self.days["Mon"]:
-            print(i.start_time)
-        #get all module codes and group combos
-
 
     def matches(string, patterns):
         return any(string.startswith(pattern) for pattern in patterns)

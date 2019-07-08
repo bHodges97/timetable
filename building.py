@@ -7,7 +7,7 @@ class Building:
     def __init__(self, name, lattitude, longitude, alias):
         self.name = name
         self.coords = (lattitude,longitude)
-        self.alias = alias
+        self.alias = alias.split()
 
     def add_room(self, room, capacity):
         self.room = room
@@ -90,7 +90,8 @@ def load_buildings(path):
         for name,lattitude,longitude,alias in reader:
             building = Building(name,lattitude,longitude,alias)
             buildings[name] = building
-            buildings[alias] = building
+            for alias in building.alias:
+                buildings[alias] = building
     return buildings
 
 def load_rooms(rooms_path, equip_path, buildings):

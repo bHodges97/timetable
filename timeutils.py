@@ -9,3 +9,6 @@ def time_to_minute(time):
 
 def minute_to_time(minute):
     return time(hour = (minute // 60), minute = (minute % 60))
+
+def minute_to_string(minute):
+    return minute_to_time(minute).strftime("%H:%M")
