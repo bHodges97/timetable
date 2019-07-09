@@ -43,39 +43,36 @@ class TimetableMetrics():
                     events = [list(filter(lambda x:week in x.weeks,events)) for events in days.values()]
                     events = [sorted(x) for x in events if x]
                     if not events:
-                        print(week,"free")
                         continue
                     for evs in events:
                         conflict = self.check_conflict(evs)
                         length = minute_to_string(evs[-1].end_time - evs[0].start_time)
-                        time = minute_to_string(self.total_time(evs))
-                        lunch_dur = self.can_get_lunch(evs)
+                        time = minute_to_string(self.waiting_time(evs))
+                        lunch_dur = self.lunch_time(evs)
 
                         distance = self.total_distance(evs)
-                        self.can_walk(evs)
-                        print(evs[0].day,combinations,"length:",length,",Total_time:",time,",Conflicts:",conflict,",Distance:",distance,",Lunch:",lunch_dur,"events",len(evs))
+                        speed = self.walk_speed(evs)
+                        metric = (week,evs[0].day,combinations,length,time,conflict,distance,speed,lunch_dur,len(evs))
+                        print(evs[0].day,combinations,"length:",length,",Waiting_time:",time,",Conflicts:",conflict,",Distance:",distance,",Lunch:",lunch_dur,"events",len(evs))
 
-    def total_time(self,events):
-        t = 0
-        for i,event in enumerate(events):
-            if not any(event.overlaps(e) for e in events[:i]):
-                t += event.end_time-event.start_time
-        return t
+    def waiting_time(self,events):
+        times = [j.start_time-i.end_time for i,j in zip(events[:-1],events[1:])]
+        return 0 if not times else round(sum(times)/len(times))
 
     def total_distance(self,events):
         distance = [i.building.distance_to(j.building) for i,j in zip(events[:-1],events[1:])]
         distance = [round(x) for x in distance]
         return sum(distance)
 
-    def can_walk(self,events):
+    def walk_speed(self,events):
         pairs = list(zip(events[:-1],events[1:]))
         times = [j.start_time-i.end_time  + 10 for i,j in pairs] # lectures are 50 mins
         distances = [i.building.distance_to(j.building) for i,j in pairs]
         speeds = [ (distance/time/60) for distance,time in zip(distances,times) ]
-        #print(speeds)
-        return speeds
+        return 0 if not speeds else max(speeds)
 
-    def can_get_lunch(self,events):
+
+    def lunch_time(self,events):
         #11:30 to 14:00
         lunchbreak = (690,840)
         s = set(range(*lunchbreak))
@@ -91,10 +88,6 @@ class TimetableMetrics():
                 if max_duration < duration:
                     max_duration = duration
         return max(max_duration,duration)
-
-
-
-
 
     def check_conflict(self,events):
         for i,event in enumerate(events[:-1]):
@@ -114,8 +107,8 @@ if __name__ == "__main__":
 
     files = ["Room List.xlsx", "Roomequip.xlsx", "Timetable2018-19.xlsx","buildings.csv"]
     paths = [os.path.join("Data",x) for x in files]
-    buildings = load_buildings(paths[3])
-    rooms = load_rooms(paths[0], paths[1], buildings)
+    buildings = load_buildings()
+    #rooms = load_rooms(paths[0], paths[1], buildings)
     timetable = Timetable(paths[2])
     modules = timetable.list_modules()
 
@@ -125,4 +118,3 @@ if __name__ == "__main__":
     timetable.load_events(events)
     m = TimetableMetrics(timetable,buildings)
     m.some_metrics()
-

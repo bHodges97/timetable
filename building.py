@@ -1,20 +1,22 @@
 import collections
 import csv
 import openpyxl as pyxl
-import geopy.distance
+import numpy as np
+from pathlib import Path
 
 class Building:
     def __init__(self, name, lattitude, longitude, alias):
         self.name = name
         self.coords = (lattitude,longitude)
         self.alias = alias.split()
+        self.distances = dict()
 
     def add_room(self, room, capacity):
         self.room = room
         self.capacity = capacity
 
     def distance_to(self, building):
-        return geopy.distance.distance(self.coords,building.coords).m
+        return self.distances[building.name]
 
     def __str__(self):
         return self.name
@@ -70,9 +72,10 @@ class Rooms(collections.MutableMapping):
         return key
 
 def distance_matrix(buildings):
+    """No longer used"""
     distances = []
     for x in buildings.values():
-        distances.append([x.distance_to(y) for y in buildings.values()])
+        distances.append([round(x.distance_to(y)) for y in buildings.values()])
     distances = np.array(distances)
     #print(distances)
     return distances
@@ -82,9 +85,10 @@ def get_building(room, buildings):
         if room.startswith(key):
             return value
 
-def load_buildings(path):
+def load_buildings():
+    p = Path('Data/buildings.csv')
     buildings = dict()
-    with open(path,'r') as f:
+    with open(p,'r') as f:
         reader = csv.reader(f)
         next(reader,None)#skip header
         for name,lattitude,longitude,alias in reader:
@@ -92,7 +96,22 @@ def load_buildings(path):
             buildings[name] = building
             for alias in building.alias:
                 buildings[alias] = building
+    load_distances(buildings)
     return buildings
+
+def load_distances(buildings):
+    p = Path('Data/buildings.csv')
+    with open(p,'r') as f:
+        reader = csv.reader(f)
+        names = next(reader)[1:]
+        for row in reader:
+            for name,dist in zip(names,row[1:]):
+                if dist == 'X':
+                    buildings[row[0]].distances[name] = 0
+                    break
+                else:
+                    buildings[row[0]].distances[name] = dist
+
 
 def load_rooms(rooms_path, equip_path, buildings):
     rooms = Rooms()
