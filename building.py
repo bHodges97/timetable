@@ -100,7 +100,7 @@ def load_buildings():
     return buildings
 
 def load_distances(buildings):
-    p = Path('Data/buildings.csv')
+    p = Path('Data/distances.csv')
     with open(p,'r') as f:
         reader = csv.reader(f)
         names = next(reader)[1:]
@@ -108,8 +108,8 @@ def load_distances(buildings):
             for name,dist in zip(names,row[1:]):
                 if dist == 'X':
                     break
-                else:
-                    buildings[row[0]].distances[name] = dist
+                buildings[row[0]].distances[name] = float(dist)
+                buildings[name].distances[row[0]] = float(dist)
 
 
 def load_rooms(rooms_path, equip_path, buildings):
