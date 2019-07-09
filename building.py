@@ -107,7 +107,6 @@ def load_distances(buildings):
         for row in reader:
             for name,dist in zip(names,row[1:]):
                 if dist == 'X':
-                    buildings[row[0]].distances[name] = 0
                     break
                 else:
                     buildings[row[0]].distances[name] = dist
