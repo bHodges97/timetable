@@ -27,57 +27,45 @@ class TimetableMetrics():
                 groups[module].add(None)#for product to work
         modules = list(groups.keys())
 
-
-
         for combinations in product(*groups.values()):
             #filter out events by group
             days = {day:set() for day in table.days}
+            scores = []
             for idx,group in enumerate(combinations):
                 filtered = filter( (lambda x:  modules[idx] in x.modules), table.events)
                 filtered = filter( (lambda x: (not x.groups) or (group in x.groups)), filtered)
                 for event in filtered:
                     days[event.day].add(event)
 
-
                 for week in range(4,31):
                     events = [list(filter(lambda x:week in x.weeks,events)) for events in days.values()]
-                    events = [sorted(x) for x in events if x]
+                    events = [sorted(x) for x in events]
+
                     if not events:
                         continue
-                    for evs in events:
+                    score = np.ndarray((7,7))
+                    for i,evs in enumerate(events):
+                        if not evs:
+                            score[i,:] = 0
+                            continue
                         conflict = self.check_conflict(evs)
-                        length = minute_to_string(evs[-1].end_time - evs[0].start_time)
-                        time = minute_to_string(self.waiting_time(evs))
+                        wait_times = [j.start_time-i.end_time for i,j in zip(evs[:-1],evs[1:])]
+                        distances = [i.building.distance_to(j.building) for i,j in zip(evs[:-1],evs[1:])]
+                        wait_time = 0 if not wait_times else round(sum(wait_times)/len(wait_times))
+                        lec_time = sum(x.length_time for x in evs)
+                        day_length = minute_to_string(evs[-1].end_time - evs[0].start_time)
                         lunch_dur = self.lunch_time(evs)
+                        speeds = [(distance/(time+10)/60) for distance,time in zip(distances,wait_times)] # include 10 mins for lec end
+                        speed = 0 if not speeds else max(speeds)
 
-                        distance = self.total_distance(evs)
-                        speed = self.walk_speed(evs)
-                        metric = (week,evs[0].day,combinations,length,time,conflict,distance,speed,lunch_dur,len(evs))
-                        print(evs[0].day,combinations,"length:",length,",Waiting_time:",time,",Conflicts:",conflict,",Distance:",distance,",Lunch:",lunch_dur,"events",len(evs))
-
-    def waiting_time(self,events):
-        times = [j.start_time-i.end_time for i,j in zip(events[:-1],events[1:])]
-        return 0 if not times else round(sum(times)/len(times))
-
-    def total_distance(self,events):
-        distance = [i.building.distance_to(j.building) for i,j in zip(events[:-1],events[1:])]
-        distance = [round(x) for x in distance]
-        return sum(distance)
-
-    def walk_speed(self,events):
-        pairs = list(zip(events[:-1],events[1:]))
-        times = [j.start_time-i.end_time  + 10 for i,j in pairs] # lectures are 50 mins
-        distances = [i.building.distance_to(j.building) for i,j in pairs]
-        speeds = [ (distance/time/60) for distance,time in zip(distances,times) ]
-        return 0 if not speeds else max(speeds)
 
 
     def lunch_time(self,events):
         #11:30 to 14:00
-        lunchbreak = (690,840)
+        lunchbreak = (690,841)
         s = set(range(*lunchbreak))
         for ev in events:
-            s.difference_update(set(range(ev.start_time,ev.end_time+1)))
+            s.difference_update(set(range(ev.start_time+1,ev.end_time)))
         s = sorted(s)
         duration = 0
         max_duration = 0
@@ -93,14 +81,14 @@ class TimetableMetrics():
         for i,event in enumerate(events[:-1]):
             if any(event.overlaps(e) for e in events[i+1:]):
                 return [str(x) for x in events[i+1:] if event.overlaps(x)] + [str(event)]
-
         return None
 
-        #get all module codes and group combos
 
-    def filter_groups(self,groups):
+    def good_time_of_day(self,events):
+        start = 10 * 60 # 10 am
+        end = 15 * 60 # 3 pm
+        return events[0].start_time >= start and events[-1].end_time <= end
 
-        return list(filter(groups.isdisjoint,(x.group for x in events)))
 
 
 if __name__ == "__main__":
@@ -114,7 +102,6 @@ if __name__ == "__main__":
 
     test = ['CS1']
     events = timetable.generate_event_list(test)
-    print(len(events))
     timetable.load_events(events)
     m = TimetableMetrics(timetable,buildings)
     m.some_metrics()
