@@ -39,6 +39,7 @@ class TimetableMetrics():
 
                 scores = []
                 conflict = None
+
                 for week in range(4,31):
                     events = [list(filter(lambda x:week in x.weeks,events)) for events in days.values()]
                     events = [sorted(x) for x in events]
@@ -65,10 +66,16 @@ class TimetableMetrics():
                         timing = self.good_time_of_day(evs)
 
                         score[i,:] = wait_time,lec_time,day_length,lunch_dur,speed,timing
-                    scores.append(score)
+                    if not scores:
+                        scores = [(score,{week})]
+                    else:
+                        for (s,weeks) in scores:
+                            if np.array_equal(s,score):
+                                weeks.add(week)
+                                break
+                        else:
+                            scores.append((score,{week}))
             scores2.append(scores)
-        for b in scores2[0]:
-            print(b)
 
 
 
