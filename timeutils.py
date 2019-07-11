@@ -17,13 +17,13 @@ def set_to_range(a):
     a = sorted(a) + [0]#ensures last term is include
     out = []
     start = a[0]
-    for x,y in zip(a[1:],a):
-        if x-1 != y:
+    for x,y in zip(a,a[1:]):
+        if x+1 != y:
             s = str(start)
-            if start != y:
-                s+="-"+str(y)
+            if start != x:
+                s+="-"+str(x)
             out.append(s)
-            start=x
+            start=y
     return ",".join(out)
 
 if __name__ == "__main__":

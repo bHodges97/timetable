@@ -38,10 +38,9 @@ class Timetable:
     def load_events(self,eventlist):
         headers = set()
         #load events from excel
-        i = 0
         for row in self.timetable.iter_rows(min_row=2,values_only=True):
             if row[0] in eventlist:
-                if not row[4] or not row[5] or not row[8]:
+                if not (row[4] and row[5] and row[8]):
                     print("Warning: Missing date/time/room info for event id",row[0])
                     continue
                 event = Event(row)
@@ -49,9 +48,8 @@ class Timetable:
                     if event.can_merge_with(e):
                         e.weeks.update(event.weeks)
                         event = None
-                        i+=1
                         break
-                if event != None:
+                if event:
                     self.events.append(event)
                     self.days[event.day].append(event)
                     headers.update((event.start_time,event.end_time))
@@ -94,8 +92,7 @@ class Timetable:
         modules = set()
         for row in self.timetable.iter_rows(min_row=2,values_only=True):
             if row[1]:
-                m = str(row[1]).split(",")
-                modules.update(m)
+                modules.update(str(row[1]).split(","))
         modules = sorted(modules)
         return modules
 

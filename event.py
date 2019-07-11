@@ -9,7 +9,7 @@ class Event:
         self.day = row[4]
         self.time = row[5]
         self.length = row[6]
-        self._init_weeks(row[7]) # weeks is set object for each week number
+        self._init_weeks(row[7]) # weeks is stored as set of all week numbers
         self.room = row[8]
         self.string_data = row[9]
         self.room_pool = row[10]
@@ -26,14 +26,10 @@ class Event:
         if isinstance(data,datetime):
             self.date.add(str(data.date()))#strftime("%b-%d")
             return
-
         weeks_strs = str(data).split(",")
         for weeks in weeks_strs:
             terms = list(map(int,weeks.split("-")))
-            if len(terms) == 1:
-                self.weeks.add(terms[0])
-            else:
-                self.weeks.update(set(range(terms[0],terms[1]+1)))
+            self.weeks.update(set(range(terms[0],terms[-1]+1)))
 
     def overlaps(self, event): #stackoverflow 325933
         return max(self.start_time, event.start_time) < min(self.end_time, event.end_time)
@@ -45,11 +41,8 @@ class Event:
         return False
 
     def col_span(self,headers):
-        for i,header in enumerate(headers):
-            if self.start_time == header:
-                self.start = i
-            elif self.end_time == header:
-                self.end = i
+        self.start = headers.index(self.start_time)
+        self.end = headers.index(self.end_time)
         self.span = self.end-self.start
         return self.span
 
@@ -72,13 +65,7 @@ class Event:
         return out + " " + dates
 
     def date_str(self):
-        date = sorted(self.date)
-        dates = ""
-        if date:
-            dates+=str(date[0])
-            for date in date[1:]:
-                dates+=","+str(date)
-        return dates
+        return ",".join(sorted(self.date)) if self.date else ""
 
     def modules_str(self):
         return ",".join(self.modules) if self.modules else ""
