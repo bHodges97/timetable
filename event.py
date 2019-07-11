@@ -67,20 +67,7 @@ class Event:
         self.date.update(event.date)
 
     def weeks_str(self):
-        out = ""
-        weeks = sorted(self.weeks)
-        if self.weeks:
-            last = weeks[0]
-            out = str(last)
-            if len(self.weeks) > 1:
-                weeks.append(0)#fixes tail
-                for i in range(1,len(weeks)):
-                    if weeks[i] != weeks[i-1]+1:
-                        if last != weeks[i-1]:
-                            out+= "-" + str(weeks[i-1])
-                        out+= "," + str(weeks[i])
-                        last=weeks[i]
-                out = out[:-2]#remove tailing ',0'
+        out = set_to_range(self.weeks)
         dates = self.date_str()
         return out + " " + dates
 
