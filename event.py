@@ -21,10 +21,9 @@ class Event:
         self.end_time = self.start_time + self.length_time
 
     def _init_weeks(self, data):
-        self.date = set()
-        self.weeks = set()
         if isinstance(data,datetime):
-            self.date.add(str(data.date()))#strftime("%b-%d")
+            start,end = sorted([data.day,data.month])
+            self.weeks = set(start,end+1)# range(5)#.add(str(data.date()))#strftime("%b-%d")
         else:
             self.weeks = range_to_set(str(data))
 
@@ -54,15 +53,10 @@ class Event:
 
     def merge_weeks(self,event):
         self.weeks.update(event.weeks)
-        self.date.update(event.date)
 
     def weeks_str(self):
-        out = set_to_range(self.weeks)
-        dates = self.date_str()
-        return out + " " + dates
+        return set_to_range(self.weeks)
 
-    def date_str(self):
-        return ",".join(sorted(self.date)) if self.date else ""
 
     def modules_str(self):
         return ",".join(self.modules) if self.modules else ""

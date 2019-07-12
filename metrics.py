@@ -13,7 +13,7 @@ class TimetableMetrics():
         self.buildings = buildings
         self.name = name
 
-    def some_metrics(self):
+    def calc_metrics(self):
         groups = dict()
         table = self.table
 
@@ -89,7 +89,6 @@ class TimetableMetrics():
         count = np.count_nonzero(np.count_nonzero(m,axis=1))
         return 0 if count == 0 else np.sum(m)/count
 
-
     def average(self,scores):
         out = np.zeros((7,5))
         scores = np.stack(scores,axis=0)
@@ -100,7 +99,7 @@ class TimetableMetrics():
         np.divide(day_scores,counts,out=out,where=counts!=0)
         return out
 
-    def plot_it(self,scores):
+    def get_averages(self,scores):
         every = []
         for s,_ in scores:
             every += [x[0] for x in s]
@@ -114,10 +113,8 @@ class TimetableMetrics():
         combo_worst = mscore
         combo_best = 0
 
-        for y in scores:
-            s,c = y
-            m = [x[0] for x in s]
-            avg = self.average(m)
+        for s,c in scores:
+            avg = self.average([x[0] for x in s])
             combo_score = self.score_of_matrix(avg)
             if combo_worst > combo_score:
                 combo_worst = combo_score
@@ -215,6 +212,6 @@ if __name__ == "__main__":
     test = sys.argv[1:]
     events = timetable.generate_event_list(test)
     timetable.load_events(events)
-    m = TimetableMetrics(timetable,buildings,'CS1')
-    a = m.some_metrics()
-    m.plot_it(a)
+    m = TimetableMetrics(timetable,buildings,sys.argv[1])
+    a = m.calc_metrics()
+    m.get_averages(a)
