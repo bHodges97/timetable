@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import openpyxl as pyxl
+import sys
 from building import *
 from timeutils import *
 from event import Event
@@ -156,7 +157,7 @@ if __name__ == "__main__":
 
     #timetable = pyxl.load_workbook(paths[2]).active
     t = Timetable(paths[2])
-    eventlist = t.generate_event_list(["CS1"])
+    eventlist = t.generate_event_list([sys.argv[1]])
     t.load_events(eventlist)
 
     out = t.render_html()

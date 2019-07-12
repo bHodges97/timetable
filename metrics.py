@@ -3,13 +3,15 @@ from building import *
 from timeutils import *
 from itertools import product
 from pathlib import Path
+import sys
 import matplotlib.pyplot as plt
 import os
 
 class TimetableMetrics():
-    def __init__(self, timetable, buildings):
+    def __init__(self, timetable, buildings,name):
         self.table = timetable
         self.buildings = buildings
+        self.name = name
 
     def some_metrics(self):
         groups = dict()
@@ -27,27 +29,27 @@ class TimetableMetrics():
             groups[module] = sorted(group)
             if not groups[module]:
                 groups[module].add(None)#for product to work
-        modules = list(groups.keys())
+        self.modules = list(groups.keys())
 
         scores2 = []
         for combination in product(*groups.values()):
             #filter out events by group
             days = {day:set() for day in table.days}
             for idx,group in enumerate(combination):
-                filtered = filter( (lambda x:  modules[idx] in x.modules), table.events)
+                filtered = filter( (lambda x:  self.modules[idx] in x.modules), table.events)
                 filtered = filter( (lambda x: (not x.groups) or (group in x.groups)), filtered)
                 for event in filtered:
                     days[event.day].add(event)
                 scores = []
                 conflict = None
 
-                for week in range(4,31):
+                for week in range(5,15):
                     events = [list(filter(lambda x:week in x.weeks,events)) for events in days.values()]
                     events = [sorted(x) for x in events]
                     if not events:
                         continue
 
-                    score = np.full((7,5),0)
+                    score = np.zeros((7,5))
                     for i,evs in enumerate(events):
                         if not evs:
                             continue
@@ -67,7 +69,7 @@ class TimetableMetrics():
                         score[i,:] = mets
 
                     if conflict:
-                        print("Conflict:",conflict)
+                        #print("Conflict:",conflict)
                         scores = []
                         break
                     for (s,weeks) in scores:
@@ -76,12 +78,17 @@ class TimetableMetrics():
                             break
                     else:
                         scores.append((score,{week}))
-                scores = [(score,set_to_range(week),np.sum(score)) for score,week in scores]
+                scores = [(score,set_to_range(week),self.score_of_matrix(score)) for score,week in scores]
                 #print(len(scores),min(x[2] for x in scores if x[2]))
             scores2.append((scores,combination))
         scores2 = [x for x in scores2 if x[0]]
         print(len(scores2))
         return scores2
+
+    def score_of_matrix(self,m):
+        count = np.count_nonzero(np.count_nonzero(m,axis=1))
+        return 0 if count == 0 else np.sum(m)/count
+
 
     def average(self,scores):
         out = np.zeros((7,5))
@@ -98,30 +105,55 @@ class TimetableMetrics():
         for s,_ in scores:
             every += [x[0] for x in s]
         avg_every = self.average(every)
+        self.plot_week(avg_every,title="Average score:" , name=(self.name+"-average"))
+        print("Avg score: ",self.score_of_matrix(avg_every))
+
 
         mscore = 100 * 7
+        bscore = 0
+        combo_worst = mscore
+        combo_best = 0
 
         for y in scores:
             s,c = y
             m = [x[0] for x in s]
+            avg = self.average(m)
+            combo_score = self.score_of_matrix(avg)
+            if combo_worst > combo_score:
+                combo_worst = combo_score
+                combo_worst_name = c
+                combo_worst_m = avg
+            if combo_best < combo_score:
+                combo_best = combo_score
+                combo_best_name = c
+                combo_best_m = avg
             for x,w,score in s:
                 if score < mscore and score > 0:
                     mscore = score
                     matrix,week,combo = x,w,c
-        print("Min score",mscore,combo,week)
-        self.plot_week((x,week),"Worse Week")
+                if score > bscore:
+                    bscore = score
+                    bmatrix,bweek,bcombo = x,w,c
+
+        print("Worst score:",mscore,list(zip(self.modules,combo)),week)
+        print("Best score:",bscore,list(zip(self.modules,bcombo)),bweek)
+        print("Worst combination avg:",combo_worst,list(zip(self.modules,combo_worst_name)))
+        print("Best combination avg:",combo_best,list(zip(self.modules,combo_best_name)))
+        self.plot_week(matrix,title="Worst score: week "+week,name=self.name+"-worst")
+        self.plot_week(matrix,title="Best score: week "+bweek,name=self.name+"-best")
+        self.plot_week(combo_best_m,title="Best combo:\n "+str(list(zip(self.modules,combo_best_name))),name=self.name+"-bestcombo")
+        self.plot_week(combo_worst_m,title="Worst combo:\n "+str(list(zip(self.modules,combo_worst_name))),name=self.name+"-worstcombo")
 
 
-    def plot_week(self,score,name):
+    def plot_week(self,matrix,title="Happiness Scores",name="output"):
         plt.clf()
         N = 7
         ind = np.arange(N)    # the x locations for the groups
         width = 0.35       # the width of the bars: can also be len(x) sequence
-        matrix,week = score
         plts= [plt.bar(ind, matrix[:,0], width)]
         plts+=[plt.bar(ind, matrix[:,i], width,bottom=np.sum(matrix[:,:i],axis=1)) for i in range(1,5)]
-        plt.ylabel('Scores'+week)
-        plt.title('metrics scores weeks:'+week)
+        plt.ylabel('Scores')
+        plt.title(title)
         plt.xticks(ind, ('Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat','Sun'))
         plt.yticks(np.arange(0, 110, 10))
         plt.legend(plts, ('wait time','walking distance','lunch break','time of day','day length',))
@@ -180,9 +212,9 @@ if __name__ == "__main__":
     timetable = Timetable(paths[2])
     modules = timetable.list_modules()
 
-    test = ['CS1']
+    test = [sys.argv[1]]
     events = timetable.generate_event_list(test)
     timetable.load_events(events)
-    m = TimetableMetrics(timetable,buildings)
+    m = TimetableMetrics(timetable,buildings,'CS1')
     a = m.some_metrics()
     m.plot_it(a)

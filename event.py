@@ -4,7 +4,7 @@ class Event:
     def __init__(self,row):
         self.id = row[0]
         self.modules = set(str(row[1]).split(','))
-        self.type = row[2]
+        self.type = row[2] if row[2] else ""
         self.groups = set(str(row[3]).split(',')) if row[3] else set()
         self.day = row[4]
         self.time = row[5]
