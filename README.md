@@ -25,10 +25,11 @@ Notes:
 - String data
 - Weeks field contains dates, dates have inconsistent formating(dd/mm and mm/dd)
 
-Room capacity list:
-  PALMERFOYER, PAL
+Room capacity is Empty:
+ * PALMERFOYER
+ * PALMERFOYER1
 
-Missing room capacity for:
+Equiment listed but room capacity missong:
 * L33-G11
 * JJT-SLINGO
 * LYLE-G72

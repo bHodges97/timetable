@@ -26,6 +26,14 @@ def set_to_range(a):
             start=y
     return ",".join(out)
 
+def range_to_set(a):
+    weeks_strs = a.split(",")
+    out = set()
+    for weeks in weeks_strs:
+        terms = list(map(int,weeks.split("-")))
+        out.update(set(range(terms[0],terms[-1]+1)))
+    return out
+
 if __name__ == "__main__":
     a = {-1,1,2,3,5,6,8,10,11,13}
     print(set_to_range(a))

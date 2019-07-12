@@ -21,15 +21,12 @@ class Event:
         self.end_time = self.start_time + self.length_time
 
     def _init_weeks(self, data):
-        self.weeks = set()
         self.date = set()
+        self.weeks = set()
         if isinstance(data,datetime):
             self.date.add(str(data.date()))#strftime("%b-%d")
-            return
-        weeks_strs = str(data).split(",")
-        for weeks in weeks_strs:
-            terms = list(map(int,weeks.split("-")))
-            self.weeks.update(set(range(terms[0],terms[-1]+1)))
+        else:
+            self.weeks = range_to_set(str(data))
 
     def overlaps(self, event): #stackoverflow 325933
         return max(self.start_time, event.start_time) < min(self.end_time, event.end_time)

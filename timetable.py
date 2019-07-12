@@ -20,6 +20,7 @@ class TimeSlot:
     def matches(self, event):
         if self.events[0]:
             return self.events[0].same_except_room(event)
+
 class Timetable:
     def __init__(self, path):
         self.timetable = pyxl.load_workbook(path, read_only = True, data_only = True).active

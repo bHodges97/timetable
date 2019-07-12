@@ -2,6 +2,7 @@ from timetable import Timetable
 from building import *
 from timeutils import *
 from itertools import product
+from pathlib import Path
 import matplotlib.pyplot as plt
 import os
 
@@ -46,7 +47,7 @@ class TimetableMetrics():
                     if not events:
                         continue
 
-                    score = np.zeros((7,5))
+                    score = np.full((7,5),0)
                     for i,evs in enumerate(events):
                         if not evs:
                             continue
@@ -59,15 +60,15 @@ class TimetableMetrics():
                         timing = self.good_time_of_day(evs)
 
                         speedscore = 20 - min(20,speed/5 * 20)
-                        lunch = min(self.lunch_time(evs), 60) / 60 * 20
-                        wtime  = 20 if wait_time <= 60 else min(0,20 - (wait_time-60)/30 * 5)
+                        lunch =   min(self.lunch_time(evs), 45) / 45 * 20
+                        wtime  = 20 if wait_time <= 60 else max(0,20 - (wait_time-60)/30 * 5)
                         dl = self.daylength(evs)
-
                         mets = (wtime,speedscore,lunch,timing,dl)
                         score[i,:] = mets
 
                     if conflict:
                         print("Conflict:",conflict)
+                        scores = []
                         break
                     for (s,weeks) in scores:
                         if np.array_equal(s,score):
@@ -76,33 +77,59 @@ class TimetableMetrics():
                     else:
                         scores.append((score,{week}))
                 scores = [(score,set_to_range(week),np.sum(score)) for score,week in scores]
-                print(len(scores),min(x[2] for x in scores if x[2]))
-            scores2.append(scores)
+                #print(len(scores),min(x[2] for x in scores if x[2]))
+            scores2.append((scores,combination))
+        scores2 = [x for x in scores2 if x[0]]
+        print(len(scores2))
         return scores2
 
+    def average(self,scores):
+        out = np.zeros((7,5))
+        scores = np.stack(scores,axis=0)
+        day_scores = np.sum(scores,axis=0)
+        counts = np.array(scores)
+        counts[counts>1] = 1
+        counts = np.sum(counts,axis=0)
+        np.divide(day_scores,counts,out=out,where=counts!=0)
+        return out
 
     def plot_it(self,scores):
+        every = []
+        for s,_ in scores:
+            every += [x[0] for x in s]
+        avg_every = self.average(every)
+
+        mscore = 100 * 7
+
+        for y in scores:
+            s,c = y
+            m = [x[0] for x in s]
+            for x,w,score in s:
+                if score < mscore and score > 0:
+                    mscore = score
+                    matrix,week,combo = x,w,c
+        print("Min score",mscore,combo,week)
+        self.plot_week((x,week),"Worse Week")
+
+
+    def plot_week(self,score,name):
+        plt.clf()
         N = 7
         ind = np.arange(N)    # the x locations for the groups
         width = 0.35       # the width of the bars: can also be len(x) sequence
-        test,week,total = scores[0][4]
-        print(test)
-        plts= [plt.bar(ind, test[:,0], width)]
-        plts+=[plt.bar(ind, test[:,i], width,bottom=np.sum(test[:,:i],axis=1)) for i in range(1,5)]
-
+        matrix,week = score
+        plts= [plt.bar(ind, matrix[:,0], width)]
+        plts+=[plt.bar(ind, matrix[:,i], width,bottom=np.sum(matrix[:,:i],axis=1)) for i in range(1,5)]
         plt.ylabel('Scores'+week)
         plt.title('metrics scores weeks:'+week)
         plt.xticks(ind, ('Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat','Sun'))
         plt.yticks(np.arange(0, 110, 10))
         plt.legend(plts, ('wait time','walking distance','lunch break','time of day','day length',))
-        plt.show()
-
-
-
+        plt.savefig(Path('plots/'+name))
 
     def lunch_time(self,events):
-        #11:30 to 14:00
-        lunchbreak = (690,841)
+        #12:00 to 13:30
+        lunchbreak = (720,811)
         s = set(range(*lunchbreak))
         for ev in events:
             s.difference_update(set(range(ev.start_time+1,ev.end_time)))
