@@ -5,9 +5,8 @@ import numpy as np
 from pathlib import Path
 
 class Building:
-    def __init__(self, name, lattitude, longitude, alias):
+    def __init__(self, name, alias):
         self.name = name
-        self.coords = (lattitude,longitude)
         self.alias = alias.split()
         self.distances = dict()
 
@@ -54,7 +53,7 @@ class Rooms(collections.MutableMapping):
     def __len__(self):
         return len(self.store)
 
-    def _keytransform(self, key):
+    def _keytransform(self, key):#TODO remove and use aliases instead
         key = key.lower()
         key = key.replace('harry','h')
         key = key.replace('nursten','n')
@@ -71,15 +70,6 @@ class Rooms(collections.MutableMapping):
         #print(key)
         return key
 
-def distance_matrix(buildings):
-    """No longer used"""
-    distances = []
-    for x in buildings.values():
-        distances.append([round(x.distance_to(y)) for y in buildings.values()])
-    distances = np.array(distances)
-    #print(distances)
-    return distances
-
 def get_building(room, buildings):
     for key,value in buildings.items():
         if room.startswith(key):
@@ -91,8 +81,8 @@ def load_buildings():
     with open(p,'r') as f:
         reader = csv.reader(f)
         next(reader,None)#skip header
-        for name,lattitude,longitude,alias in reader:
-            building = Building(name,lattitude,longitude,alias)
+        for name,alias in reader:
+            building = Building(name,alias)
             buildings[name] = building
             for alias in building.alias:
                 buildings[alias] = building

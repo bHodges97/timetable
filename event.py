@@ -1,6 +1,9 @@
 from timeutils import *
 
 class Event:
+    """Represents an event in the timetable
+       Time and duration represented by seconds
+    """
     def __init__(self,row):
         self.id = row[0]
         self.modules = set(str(row[1]).split(','))
@@ -37,6 +40,7 @@ class Event:
         return False
 
     def col_span(self,headers):
+        """Find how many columns event takes up for give column headers"""
         self.start = headers.index(self.start_time)
         self.end = headers.index(self.end_time)
         self.span = self.end-self.start
