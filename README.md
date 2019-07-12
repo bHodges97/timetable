@@ -7,6 +7,19 @@ pip3 install -r requirements.txt
 ```
 
 ## Usage
+Creating timetable for modules with name beginning in any of module1,module2...
+```
+python3 timetable.py module1 module2 ...
+```
+Get metrics for timetable
+```
+python3 metrics.py module1 module2 ...
+```
+
+
+
+
+
 Generate event_id list from list of modules. The given modules matches the start of the module codes in the spreasheet. For example, 'CS' would match all module codes beginnng with CS.
 ```
 python3 getevents.py "spreadsheet path" module ... -o "output file"
