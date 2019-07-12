@@ -157,7 +157,7 @@ if __name__ == "__main__":
 
     #timetable = pyxl.load_workbook(paths[2]).active
     t = Timetable(paths[2])
-    eventlist = t.generate_event_list([sys.argv[1]])
+    eventlist = t.generate_event_list(sys.argv[1:])
     t.load_events(eventlist)
 
     out = t.render_html()

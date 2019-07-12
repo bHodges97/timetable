@@ -69,7 +69,7 @@ class TimetableMetrics():
                         score[i,:] = mets
 
                     if conflict:
-                        #print("Conflict:",conflict)
+                        print("Conflict:",conflict)
                         scores = []
                         break
                     for (s,weeks) in scores:
@@ -212,7 +212,7 @@ if __name__ == "__main__":
     timetable = Timetable(paths[2])
     modules = timetable.list_modules()
 
-    test = [sys.argv[1]]
+    test = sys.argv[1:]
     events = timetable.generate_event_list(test)
     timetable.load_events(events)
     m = TimetableMetrics(timetable,buildings,'CS1')
